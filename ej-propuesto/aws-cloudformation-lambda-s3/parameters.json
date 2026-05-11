@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "lab"
+  },
+  {
+    "ParameterKey": "UniqueSuffix",
+    "ParameterValue": "jdtl"
+  },
+  {
+    "ParameterKey": "LambdaRuntime",
+    "ParameterValue": "python3.12"
+  }
+]

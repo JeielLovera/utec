@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Ejercicio Propuesto AWS — Lambda + S3 con CloudFormation.
+  Crea un bucket S3 y una función Lambda con permisos para leer y escribir en él.
+
+# =============================================================
+# PARAMETERS — Variables de entrada parametrizables
+# =============================================================
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: lab
+    AllowedValues:
+      - lab
+      - dev
+      - prod
+    Description: Nombre del entorno (lab, dev o prod)
+
+  UniqueSuffix:
+    Type: String
+    Description: Sufijo unico para evitar conflictos de nombres (ej. nombre-del-alumno)
+
+  LambdaRuntime:
+    Type: String
+    Default: python3.12
+    AllowedValues:
+      - python3.12
+      - python3.11
+      - nodejs20.x
+    Description: Runtime de la función Lambda
+
+# =============================================================
+# RESOURCES — Recursos a aprovisionar (OBLIGATORIO)
+# =============================================================
+Resources:
+
+  # --- Bucket S3 ---
+  LabS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "lab-lambda-s3-${UniqueSuffix}-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-S3-${UniqueSuffix}"
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # --- IAM Role para Lambda ---
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-lambda-role-${UniqueSuffix}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt LabS3Bucket.Arn
+                  - !Sub "${LabS3Bucket.Arn}/*"
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # --- Función Lambda ---
+  LabLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${EnvironmentName}-lambda-${UniqueSuffix}"
+      Description: Función Lambda que interactúa con el bucket S3
+      Runtime: !Ref LambdaRuntime
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref LabS3Bucket
+          ENVIRONMENT: !Ref EnvironmentName
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+
+          s3 = boto3.client('s3')
+          BUCKET_NAME = os.environ['BUCKET_NAME']
+
+          def handler(event, context):
+              action = event.get('action', 'list')
+
+              if action == 'list':
+                  response = s3.list_objects_v2(Bucket=BUCKET_NAME)
+                  objects = [obj['Key'] for obj in response.get('Contents', [])]
+                  return {'statusCode': 200, 'body': json.dumps({'objects': objects})}
+
+              if action == 'write':
+                  key = event.get('key', 'test.txt')
+                  content = event.get('content', 'Hello from Lambda!')
+                  s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=content)
+                  return {'statusCode': 200, 'body': json.dumps({'message': f'Objeto {key} creado'})}
+
+              return {'statusCode': 400, 'body': json.dumps({'error': 'Accion no reconocida'})}
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-Lambda-${UniqueSuffix}"
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+# =============================================================
+# OUTPUTS — Valores exportados al finalizar el despliegue
+# =============================================================
+Outputs:
+  S3BucketName:
+    Description: Nombre del bucket S3 creado
+    Value: !Ref LabS3Bucket
+    Export:
+      Name: !Sub "${EnvironmentName}-S3BucketName-${UniqueSuffix}"
+
+  S3BucketArn:
+    Description: ARN del bucket S3
+    Value: !GetAtt LabS3Bucket.Arn
+
+  LambdaFunctionName:
+    Description: Nombre de la función Lambda
+    Value: !Ref LabLambdaFunction
+    Export:
+      Name: !Sub "${EnvironmentName}-LambdaName-${UniqueSuffix}"
+
+  LambdaFunctionArn:
+    Description: ARN de la función Lambda
+    Value: !GetAtt LabLambdaFunction.Arn
+
+  LambdaRoleArn:
+    Description: ARN del IAM Role de la Lambda
+    Value: !GetAtt LambdaExecutionRole.Arn
