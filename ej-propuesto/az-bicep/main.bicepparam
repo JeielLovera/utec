@@ -12,7 +12,7 @@
       "value": "Standard_LRS"
     },
     "uniqueSuffix": {
-      "value": "<student_name>"
+      "value": "jdtl"
     }
   }
 }
