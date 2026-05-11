@@ -1,17 +1,17 @@
-# ☁️ Azure — Storage Account + Cosmos DB con Bicep
+# ☁️ Azure — Storage Account + Key Vault con Bicep
 
 **Ejercicio:** Propuesto 02  
 **Herramienta:** Azure Bicep  
-**Recursos:** Storage Account (Blob), Cosmos DB (NoSQL)
+**Recursos:** Storage Account (Blob), Key Vault
 
 ---
 
 ## 🎯 Objetivo
 
-Desplegar almacenamiento de objetos y una base de datos no relacional en Azure usando Bicep. Al finalizar habrás creado:
+Desplegar almacenamiento de objetos y un gestor de secretos en Azure usando Bicep. Al finalizar habrás creado:
 
 - ✅ Una **Storage Account** con un contenedor Blob para ficheros
-- ✅ Una cuenta **Cosmos DB** (API SQL/NoSQL) en modo serverless con una base de datos y un contenedor
+- ✅ Un **Key Vault** para gestión segura de secretos, claves y certificados
 
 ---
 
@@ -58,7 +58,7 @@ az deployment group what-if \
 
 ```bash
 az deployment group create \
-  --name deploy-bicep-storage-cosmos \
+  --name deploy-bicep-storage-kv \
   --resource-group <tu-resource-group> \
   --template-file main.bicep \
   --parameters @main.bicepparam
@@ -68,7 +68,7 @@ az deployment group create \
 
 ```bash
 az deployment group show \
-  --name deploy-bicep-storage-cosmos \
+  --name deploy-bicep-storage-kv \
   --resource-group <tu-resource-group> \
   --query properties.outputs \
   --output table
@@ -91,11 +91,11 @@ az storage account show \
   --name <nombre-storage> \
   --query '{Nombre:name,SKU:sku.name,Estado:provisioningState}'
 
-# Verificar Cosmos DB
-az cosmosdb show \
+# Verificar Key Vault
+az keyvault show \
   --resource-group <tu-resource-group> \
-  --name <nombre-cosmos> \
-  --query '{Nombre:name,Endpoint:documentEndpoint,Estado:provisioningState}'
+  --name <nombre-keyvault> \
+  --query '{Nombre:name,URI:properties.vaultUri,Estado:properties.provisioningState}'
 ```
 
 ---
@@ -104,7 +104,7 @@ az cosmosdb show \
 
 ```bash
 az deployment group delete \
-  --name deploy-bicep-storage-cosmos \
+  --name deploy-bicep-storage-kv \
   --resource-group <tu-resource-group>
 ```
 
@@ -115,9 +115,7 @@ az deployment group delete \
 | Concepto | Descripción |
 |----------|-------------|
 | `parent` | Relación jerárquica entre recursos en Bicep (ej. blobService dentro de storageAccount) |
-| Cosmos DB serverless | Modo de facturación por operación, ideal para cargas variables o laboratorios |
-| Partition key | Campo usado para distribuir datos en Cosmos DB, aquí `/id` |
+| `enableRbacAuthorization` | Controla el acceso al Key Vault mediante roles de Azure AD en lugar de access policies |
+| `enableSoftDelete` | Protege contra eliminaciones accidentales, con retención de 7 días |
 | `uniqueString()` | Genera un hash determinista basado en el Resource Group para nombres únicos |
-| Free Tier | Cosmos DB ofrece un nivel gratuito (1 cuenta por suscripción) |
-
-> ⚠️ Cosmos DB Free Tier solo está disponible en una cuenta por suscripción. Si ya tienes una cuenta con Free Tier activo, cambia `enableFreeTier` a `false` en `main.bicep`.
+| `subscription().tenantId` | Referencia dinámica al tenant de la suscripción activa |

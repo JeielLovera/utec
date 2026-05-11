@@ -13,9 +13,6 @@
     },
     "uniqueSuffix": {
       "value": "<student_name>"
-    },
-    "cosmosThroughput": {
-      "value": 400
     }
   }
 }
